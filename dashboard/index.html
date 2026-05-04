@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agentic SOC — Command Centre</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#070a0d;--surface:#0c1018;--surface2:#111820;--border:#1a2535;--border2:#243040;
+  --gold:#c8a96e;--blue:#4a9eff;--green:#4ade80;--red:#f87171;--purple:#a78bfa;--orange:#fb923c;
+  --text:#d4dae3;--dim:#4a5568;--mid:#7a8fa8;
+}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;height:100vh;overflow:hidden}
+.app{display:grid;grid-template-rows:52px 1fr;grid-template-columns:220px 1fr 300px;height:100vh}
+
+/* TOPBAR */
+.topbar{grid-column:1/-1;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 20px;gap:20px}
+.logo{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--gold);letter-spacing:.15em;font-weight:500}
+.logo span{color:var(--dim)}
+.status-pill{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 10px;border-radius:2px;
+  letter-spacing:.1em;border:1px solid}
+.pill-idle{color:var(--mid);border-color:var(--border2)}
+.pill-active{color:var(--green);border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.05);animation:pulse 2s infinite}
+.pill-alert{color:var(--red);border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.05)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.time{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim)}
+
+/* SIDEBAR */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:16px 0;overflow-y:auto}
+.nav-section{padding:0 12px;margin-bottom:20px}
+.nav-label{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);letter-spacing:.2em;
+  text-transform:uppercase;padding:0 8px;margin-bottom:8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:3px;
+  cursor:pointer;font-size:12px;color:var(--mid);border:1px solid transparent;margin-bottom:2px;transition:.15s}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:rgba(200,169,110,.08);color:var(--gold);border-color:rgba(200,169,110,.2)}
+.nav-icon{font-size:14px;width:18px;text-align:center}
+.nav-badge{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:9px;
+  padding:2px 6px;border-radius:2px;background:rgba(248,113,113,.15);color:var(--red)}
+
+/* MAIN */
+.main{overflow-y:auto;padding:20px;background:var(--bg)}
+
+/* RIGHT PANEL */
+.right-panel{background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;padding:16px}
+.panel-title{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);
+  letter-spacing:.2em;text-transform:uppercase;margin-bottom:14px}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:16px;margin-bottom:12px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.card-title{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);letter-spacing:.1em}
+
+/* METRICS ROW */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:14px}
+.metric-val{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:500;line-height:1}
+.metric-label{font-size:11px;color:var(--mid);margin-top:6px}
+.metric-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;margin-top:4px}
+
+/* ALERTS TABLE */
+.alert-row{display:grid;grid-template-columns:60px 1fr 100px 90px 80px;gap:8px;
+  padding:10px 12px;border-bottom:1px solid var(--border);align-items:center;
+  cursor:pointer;transition:.15s;font-size:12px}
+.alert-row:hover{background:var(--surface2)}
+.alert-row.selected{background:rgba(74,158,255,.05);border-left:2px solid var(--blue)}
+.sev{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 7px;border-radius:2px;text-align:center}
+.sev-critical{background:rgba(248,113,113,.15);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+.sev-high{background:rgba(251,146,60,.15);color:var(--orange);border:1px solid rgba(251,146,60,.3)}
+.sev-medium{background:rgba(250,204,21,.1);color:#fbbf24;border:1px solid rgba(250,204,21,.2)}
+.sev-low{background:rgba(74,222,128,.08);color:var(--green);border:1px solid rgba(74,222,128,.2)}
+.alert-status{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim)}
+.alert-status.investigating{color:var(--blue)}
+.alert-status.resolved{color:var(--green)}
+
+/* AGENT LOG */
+.log-entry{padding:8px 10px;border-left:2px solid var(--border2);margin-bottom:6px;font-size:11px}
+.log-entry.thought{border-color:var(--purple)}
+.log-entry.safety{border-color:var(--orange)}
+.log-entry.result{border-color:var(--green)}
+.log-entry.error{border-color:var(--red)}
+.log-entry.start{border-color:var(--gold)}
+.log-event{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);margin-bottom:4px}
+.log-msg{color:var(--text-mid);line-height:1.5;color:var(--mid)}
+.log-time{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--dim);margin-top:3px}
+
+/* APPROVAL CARD */
+.approval-card{background:rgba(248,113,113,.05);border:1px solid rgba(248,113,113,.25);
+  border-radius:4px;padding:14px;margin-bottom:10px}
+.approval-title{font-size:12px;color:var(--red);margin-bottom:8px;font-weight:500}
+.approval-detail{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--mid);
+  margin-bottom:10px;line-height:1.6}
+.btn-row{display:flex;gap:8px}
+.btn{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:6px 14px;border-radius:3px;
+  border:1px solid;cursor:pointer;letter-spacing:.05em;transition:.15s}
+.btn-approve{background:rgba(74,222,128,.1);color:var(--green);border-color:rgba(74,222,128,.3)}
+.btn-approve:hover{background:rgba(74,222,128,.2)}
+.btn-reject{background:rgba(248,113,113,.1);color:var(--red);border-color:rgba(248,113,113,.3)}
+.btn-reject:hover{background:rgba(248,113,113,.2)}
+.btn-primary{background:rgba(200,169,110,.1);color:var(--gold);border-color:rgba(200,169,110,.3);padding:8px 20px}
+.btn-primary:hover{background:rgba(200,169,110,.2)}
+
+/* TRIGGER PANEL */
+.trigger-input{width:100%;background:var(--surface2);border:1px solid var(--border2);
+  border-radius:3px;padding:10px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;
+  font-size:11px;resize:vertical;min-height:80px;outline:none;line-height:1.6}
+.trigger-input:focus{border-color:rgba(200,169,110,.4)}
+
+/* BLAST METER */
+.blast-bar{height:4px;border-radius:2px;background:var(--border);margin-top:4px}
+.blast-fill{height:100%;border-radius:2px;transition:.3s}
+
+/* TOOL CHIP */
+.tool-chip{display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;
+  font-size:9px;padding:4px 8px;border-radius:2px;background:var(--surface2);
+  border:1px solid var(--border2);color:var(--mid);margin:2px}
+.chip-blast{padding:1px 5px;border-radius:1px;font-size:8px}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* LEDGER */
+.ledger-entry{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:8px 10px;
+  background:var(--surface2);border-radius:3px;margin-bottom:6px;color:var(--mid);line-height:1.7}
+.ledger-tool{color:var(--gold)}
+.ledger-rollback{color:var(--green);font-size:9px;margin-top:3px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+const API = 'http://' + window.location.hostname + ':8000';
+
+const DEMO_ALERTS = [
+  {id:'ALT001',sev:'CRITICAL',level:10,desc:'SSH Brute Force — 47 failed attempts',src:'192.168.100.50',agent:'victim-node',status:'resolved',ts:'05:31:02'},
+  {id:'ALT002',sev:'HIGH',level:8,desc:'Port Scan — 1024 ports probed',src:'192.168.100.50',agent:'victim-node',status:'investigating',ts:'05:38:14'},
+  {id:'ALT003',sev:'HIGH',level:8,desc:'CVE-2023-38408 — Vulnerable OpenSSH detected',src:'192.168.100.10',agent:'victim-node',status:'open',ts:'05:41:55'},
+  {id:'ALT004',sev:'MEDIUM',level:6,desc:'Suspicious outbound connection attempt',src:'192.168.100.10',agent:'victim-node',status:'open',ts:'05:43:01'},
+  {id:'ALT005',sev:'LOW',level:4,desc:'Failed sudo attempt — unknown user',src:'192.168.100.10',agent:'victim-node',status:'open',ts:'05:44:10'},
+];
+
+function sevClass(s){return 'sev sev-'+s.toLowerCase()}
+function blastColor(n){if(n<=3)return'#4ade80';if(n<=6)return'#fbbf24';if(n<=8)return'#fb923c';return'#f87171'}
+
+function TopBar({agentStatus, pendingCount}){
+  const [time,setTime]=useState(new Date().toUTCString().slice(17,25));
+  useEffect(()=>{const t=setInterval(()=>setTime(new Date().toUTCString().slice(17,25)),1000);return()=>clearInterval(t)},[]);
+  const pillClass = agentStatus==='investigating'?'pill-active':pendingCount>0?'pill-alert':'pill-idle';
+  const pillText = agentStatus==='investigating'?'● AGENT ACTIVE':pendingCount>0?`⚠ ${pendingCount} AWAITING APPROVAL`:'○ STANDBY';
+  return(
+    <div className="topbar">
+      <div className="logo">AGENTIC<span>/</span>SOC <span style={{color:'#2e3d50'}}>//</span> <span style={{color:'#4a5568',fontSize:10}}>v1.0 · ON-PREM</span></div>
+      <div className={`status-pill ${pillClass}`}>{pillText}</div>
+      <div className="topbar-right">
+        <span className="time">UTC {time}</span>
+        <span style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'#2e3d50'}}>llama3.2:3b · local</span>
+      </div>
+    </div>
+  );
+}
+
+function Sidebar({active,setActive,pendingCount}){
+  const items=[
+    {id:'overview',icon:'◈',label:'Overview'},
+    {id:'alerts',icon:'⚡',label:'Alert Queue'},
+    {id:'agent',icon:'◎',label:'Agent Log'},
+    {id:'approvals',icon:'⊘',label:'Approvals',badge:pendingCount},
+    {id:'tools',icon:'⚙',label:'Tool Registry'},
+    {id:'ledger',icon:'▦',label:'Rollback Ledger'},
+    {id:'memory',icon:'◉',label:'Agent Memory'},
+  ];
+  return(
+    <div className="sidebar">
+      <div className="nav-section">
+        <div className="nav-label">Navigation</div>
+        {items.map(i=>(
+          <div key={i.id} className={`nav-item ${active===i.id?'active':''}`} onClick={()=>setActive(i.id)}>
+            <span className="nav-icon">{i.icon}</span>
+            {i.label}
+            {i.badge>0 && <span className="nav-badge">{i.badge}</span>}
+          </div>
+        ))}
+      </div>
+      <div className="nav-section" style={{marginTop:'auto'}}>
+        <div className="nav-label">Environment</div>
+        <div style={{padding:'0 8px'}}>
+          {[
+            {label:'Wazuh SIEM',color:'#4ade80'},
+            {label:'Ollama LLM',color:'#4ade80'},
+            {label:'Agent Core',color:'#4ade80'},
+            {label:'Victim Node',color:'#fbbf24'},
+          ].map(s=>(
+            <div key={s.label} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 4px',fontSize:11,color:'#4a5568'}}>
+              <div style={{width:6,height:6,borderRadius:'50%',background:s.color}}/>
+              {s.label}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Overview({alerts,setActive,agentStatus,onTrigger}){
+  const [input,setInput]=useState('SSH brute force attack detected — 47 failed attempts from 192.168.100.50 against victim-node');
+  const [firing,setFiring]=useState(false);
+  const resolved=alerts.filter(a=>a.status==='resolved').length;
+  return(
+    <div>
+      <div className="metrics">
+        <div className="metric"><div className="metric-val" style={{color:'#f87171'}}>{alerts.length}</div><div className="metric-label">Active Alerts</div><div className="metric-sub" style={{color:'#f87171'}}>↑ 3 last hour</div></div>
+        <div className="metric"><div className="metric-val" style={{color:'#4ade80'}}>{resolved}</div><div className="metric-label">Auto-Resolved</div><div className="metric-sub" style={{color:'#4ade80'}}>by agent</div></div>
+        <div className="metric"><div className="metric-val" style={{color:'#c8a96e'}}>8</div><div className="metric-label">Tools Available</div><div className="metric-sub" style={{color:'#4a5568'}}>0 pending review</div></div>
+        <div className="metric"><div className="metric-val" style={{color:'#4a9eff'}}>00:47</div><div className="metric-label">Avg Response</div><div className="metric-sub" style={{color:'#4a9eff'}}>vs 4h human avg</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-header"><div className="card-title">⚡ TRIGGER INVESTIGATION</div></div>
+        <textarea className="trigger-input" value={input} onChange={e=>setInput(e.target.value)} placeholder="Paste alert description or natural language directive..."/>
+        <div style={{display:'flex',gap:10,marginTop:10,alignItems:'center'}}>
+          <button className="btn btn-primary" disabled={firing||agentStatus==='investigating'} onClick={async()=>{
+            setFiring(true);
+            await onTrigger(input);
+            setFiring(false);
+          }}>{firing?'DISPATCHING...':'▶ DISPATCH AGENT'}</button>
+          <span style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'#4a5568'}}>
+            {agentStatus==='investigating'?'Agent currently investigating...':'Ready'}
+          </span>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header"><div className="card-title">⚡ RECENT ALERTS</div>
+          <span style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'#4a5568',cursor:'pointer'}} onClick={()=>setActive('alerts')}>VIEW ALL →</span>
+        </div>
+        <div style={{borderTop:'1px solid var(--border)'}}>
+          <div className="alert-row" style={{color:'var(--dim)',fontSize:10,fontFamily:'IBM Plex Mono'}}>
+            <span>SEV</span><span>DESCRIPTION</span><span>SOURCE IP</span><span>STATUS</span><span>TIME</span>
+          </div>
+          {alerts.slice(0,4).map(a=>(
+            <div key={a.id} className="alert-row">
+              <span className={sevClass(a.sev)}>{a.sev}</span>
+              <span style={{fontSize:11}}>{a.desc}</span>
+              <span style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'#7a8fa8'}}>{a.src}</span>
+              <span className={`alert-status ${a.status}`}>{a.status.toUpperCase()}</span>
+              <span style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'#4a5568'}}>{a.ts}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AlertQueue({alerts,onInvestigate}){
+  const [sel,setSel]=useState(null);
+  return(
+    <div>
+      <div className="card" style={{padding:0}}>
+        <div style={{padding:'12px 16px',borderBottom:'1px solid var(--border)'}}>
+          <div className="card-title">⚡ ALERT QUEUE — {alerts.length} ACTIVE</div>
+        </div>
+        <div className="alert-row" style={{color:'var(--dim)',fontSize:10,fontFamily:'IBM Plex Mono',background:'var(--surface2)'}}>
+          <span>SEV</span><span>DESCRIPTION</span><span>SOURCE IP</span><span>STATUS</span><span>TIME</span>
+        </div>
+        {alerts.map(a=>(
+          <div key={a.id} className={`alert-row ${sel===a.id?'selected':''}`} onClick={()=>setSel(sel===a.id?null:a.id)}>
+            <span className={sevClass(a.sev)}>{a.sev}</span>
+            <span style={{fontSize:11}}>{a.desc}</span>
+            <span style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'#7a8fa8'}}>{a.src}</span>
+            <span className={`alert-status ${a.status}`}>{a.status.toUpperCase()}</span>
+            <span style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'#4a5568'}}>{a.ts}</span>
+          </div>
+        ))}
+        {sel && (
+          <div style={{padding:16,background:'rgba(74,158,255,.03)',borderTop:'1px solid var(--border)'}}>
+            <div style={{fontFamily:'IBM Plex Mono',fontSize:11,color:'#7a8fa8',marginBottom:12}}>
+              ALERT ID: {sel} · {alerts.find(a=>a.id===sel)?.desc}
+            </div>
+            <button className="btn btn-primary" onClick={()=>onInvestigate(alerts.find(a=>a.id===sel)?.desc)}>
+              ▶ DISPATCH AGENT TO INVESTIGATE
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AgentLog({log}){
+  const ref=useRef(null);
+  useEffect(()=>{if(ref.current)ref.current.scrollTop=ref.current.scrollHeight},[log]);
+  function entryClass(ev){
+    if(ev.includes('THOUGHT'))return 'thought';
+    if(ev.includes('SAFETY'))return 'safety';
+    if(ev.includes('RESULT'))return 'result';
+    if(ev.includes('ERROR'))return 'error';
+    if(ev.includes('START')||ev.includes('COMPLETE'))return 'start';
+    return '';
+  }
+  return(
+    <div className="card" style={{height:'calc(100vh - 120px)'}}>
+      <div className="card-header"><div className="card-title">◎ AGENT REASONING LOG</div>
+        <span style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'#4a5568'}}>{log.length} entries</span>
+      </div>
+      <div ref={ref} style={{overflow:'auto',height:'calc(100% - 40px)'}}>
+        {log.length===0 && <div style={{color:'var(--dim)',fontFamily:'IBM Plex Mono',fontSize:11,padding:20}}>No investigations yet. Dispatch an agent from Overview.</div>}
+        {log.map((e,i)=>(
+          <div key={i} className={`log-entry ${entryClass(e.event)}`}>
+            <div className="log-event">{e.event} · {e.id}</div>
+            <div className="log-msg">{e.message}</div>
+            {e.data && Object.keys(e.data).length>0 && (
+              <div style={{fontFamily:'IBM Plex Mono',fontSize:9,color:'#2e3d50',marginTop:4,wordBreak:'break-all'}}>
+                {JSON.stringify(e.data).slice(0,120)}{JSON.stringify(e.data).length>120?'...':''}
+              </div>
+            )}
+            <div className="log-time">{e.timestamp?.slice(11,19)} UTC</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Approvals({pending,onApprove,onReject}){
+  return(
+    <div>
+      <div className="card-title" style={{marginBottom:14}}>⊘ PENDING APPROVALS — {pending.length}</div>
+      {pending.length===0 && (
+        <div style={{color:'var(--dim)',fontFamily:'IBM Plex Mono',fontSize:11,padding:20,textAlign:'center'}}>
+          No actions awaiting approval.<br/>High blast-radius actions will appear here.
+        </div>
+      )}
+      {pending.map(a=>(
+        <div key={a.approval_id} className="approval-card">
+          <div className="approval-title">⚠ {a.tool.toUpperCase()} — Blast Radius {a.blast_radius}/10</div>
+          <div className="approval-detail">
+            ID: {a.approval_id}<br/>
+            Params: {JSON.stringify(a.params)}<br/>
+            Reversible: {a.reversible?'YES':'NO'}<br/>
+            Requested: {a.requested_at?.slice(11,19)} UTC
+          </div>
+          <div className="blast-bar"><div className="blast-fill" style={{width:`${a.blast_radius*10}%`,background:blastColor(a.blast_radius)}}/></div>
+          <div className="btn-row" style={{marginTop:12}}>
+            <button className="btn btn-approve" onClick={()=>onApprove(a.approval_id)}>✓ APPROVE</button>
+            <button className="btn btn-reject" onClick={()=>onReject(a.approval_id)}>✕ REJECT</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ToolRegistry({tools}){
+  return(
+    <div>
+      {tools.map(t=>(
+        <div key={t.name} className="card" style={{marginBottom:10}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+            <span style={{fontFamily:'IBM Plex Mono',fontSize:11,color:'var(--gold)'}}>{t.name}</span>
+            <div style={{display:'flex',gap:6,alignItems:'center'}}>
+              <span style={{fontFamily:'IBM Plex Mono',fontSize:9,color:blastColor(t.blast_radius)}}>BLAST {t.blast_radius}/10</span>
+              <span style={{fontFamily:'IBM Plex Mono',fontSize:9,color:t.reversible?'var(--green)':'var(--red)'}}>
+                {t.reversible?'REVERSIBLE':'IRREVERSIBLE'}
+              </span>
+            </div>
+          </div>
+          <div className="blast-bar"><div className="blast-fill" style={{width:`${t.blast_radius*10}%`,background:blastColor(t.blast_radius)}}/></div>
+          <div style={{fontSize:11,color:'var(--mid)',marginTop:8,lineHeight:1.6}}>{t.description}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RollbackLedger({ledger}){
+  return(
+    <div>
+      <div className="card-title" style={{marginBottom:14}}>▦ ROLLBACK LEDGER — {ledger.length} entries</div>
+      {ledger.length===0 && <div style={{color:'var(--dim)',fontFamily:'IBM Plex Mono',fontSize:11}}>No executed actions yet.</div>}
+      {[...ledger].reverse().map((e,i)=>(
+        <div key={i} className="ledger-entry">
+          <span className="ledger-tool">{e.tool}</span> · {e.timestamp?.slice(11,19)} UTC<br/>
+          Params: {JSON.stringify(e.params).slice(0,80)}<br/>
+          {e.rollback_cmd && <div className="ledger-rollback">↩ {e.rollback_cmd}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Memory({episodes}){
+  return(
+    <div>
+      <div className="card-title" style={{marginBottom:14}}>◉ EPISODIC MEMORY — {episodes.length} episodes</div>
+      {episodes.length===0 && <div style={{color:'var(--dim)',fontFamily:'IBM Plex Mono',fontSize:11}}>No completed investigations stored yet.</div>}
+      {[...episodes].reverse().map((e,i)=>(
+        <div key={i} className="card" style={{marginBottom:10}}>
+          <div style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--gold)',marginBottom:6}}>{e.id} · {e.timestamp?.slice(0,19)}</div>
+          <div style={{fontSize:11,color:'var(--text)',marginBottom:6}}>{e.trigger}</div>
+          <div style={{fontSize:11,color:'var(--mid)',marginBottom:4}}>Outcome: {e.outcome}</div>
+          <div style={{fontFamily:'IBM Plex Mono',fontSize:9,color:'var(--dim)'}}>Lesson: {e.lessons}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RightPanel({log,agentStatus}){
+  const recent=log.slice(-6).reverse();
+  return(
+    <div className="right-panel">
+      <div className="panel-title">Live Activity</div>
+      {recent.length===0 && <div style={{color:'var(--dim)',fontFamily:'IBM Plex Mono',fontSize:10}}>Awaiting agent activity...</div>}
+      {recent.map((e,i)=>(
+        <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:'1px solid var(--border)'}}>
+          <div style={{fontFamily:'IBM Plex Mono',fontSize:9,color:'var(--dim)',marginBottom:3}}>{e.event}</div>
+          <div style={{fontSize:11,color:'var(--mid)',lineHeight:1.5}}>{e.message.slice(0,90)}{e.message.length>90?'...':''}</div>
+          <div style={{fontFamily:'IBM Plex Mono',fontSize:8,color:'#2e3d50',marginTop:3}}>{e.timestamp?.slice(11,19)} UTC</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function App(){
+  const [active,setActive]=useState('overview');
+  const [log,setLog]=useState([]);
+  const [pending,setPending]=useState([]);
+  const [tools,setTools]=useState([]);
+  const [ledger,setLedger]=useState([]);
+  const [episodes,setEpisodes]=useState([]);
+  const [agentStatus,setAgentStatus]=useState('idle');
+  const [alerts,setAlerts]=useState(DEMO_ALERTS);
+
+  useEffect(()=>{
+    async function poll(){
+      try{
+        const [logR,pendR,statusR,ledgerR,memR]=await Promise.all([
+          fetch(`${API}/log?limit=100`).then(r=>r.json()).catch(()=>({log:[]})),
+          fetch(`${API}/approvals`).then(r=>r.json()).catch(()=>({pending:[]})),
+          fetch(`${API}/status`).then(r=>r.json()).catch(()=>({state:'idle'})),
+          fetch(`${API}/rollback-ledger`).then(r=>r.json()).catch(()=>({ledger:[]})),
+          fetch(`${API}/memory`).then(r=>r.json()).catch(()=>({episodes:[]})),
+        ]);
+        setLog(logR.log||[]);
+        setPending(pendR.pending||[]);
+        setAgentStatus(statusR.state||'idle');
+        setLedger(ledgerR.ledger||[]);
+        setEpisodes(memR.episodes||[]);
+      }catch(e){}
+    }
+    async function loadTools(){
+      try{const r=await fetch(`${API}/tools`).then(r=>r.json());setTools(r.tools||[]);}catch(e){}
+    }
+    loadTools();
+    poll();
+    const t=setInterval(poll,2000);
+    return()=>clearInterval(t);
+  },[]);
+
+  async function onTrigger(alert){
+    const id=`INV-${Date.now()}`;
+    await fetch(`${API}/investigate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({alert,investigation_id:id})});
+    setActive('agent');
+  }
+  async function onApprove(id){await fetch(`${API}/approvals/${id}/approve`,{method:'POST'});}
+  async function onReject(id){await fetch(`${API}/approvals/${id}/reject`,{method:'POST'});}
+
+  const views={
+    overview:<Overview alerts={alerts} setActive={setActive} agentStatus={agentStatus} onTrigger={onTrigger}/>,
+    alerts:<AlertQueue alerts={alerts} onInvestigate={onTrigger}/>,
+    agent:<AgentLog log={log}/>,
+    approvals:<Approvals pending={pending} onApprove={onApprove} onReject={onReject}/>,
+    tools:<ToolRegistry tools={tools}/>,
+    ledger:<RollbackLedger ledger={ledger}/>,
+    memory:<Memory episodes={episodes}/>,
+  };
+
+  return(
+    <div className="app">
+      <TopBar agentStatus={agentStatus} pendingCount={pending.length}/>
+      <Sidebar active={active} setActive={setActive} pendingCount={pending.length}/>
+      <div className="main">{views[active]}</div>
+      <RightPanel log={log} agentStatus={agentStatus}/>
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById('root'));
+</script>
+</body>
+</html>

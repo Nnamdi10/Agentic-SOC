@@ -1,0 +1,100 @@
+networks:
+  soc-net:
+    driver: bridge
+
+volumes:
+  wazuh-data:
+  wazuh-logs:
+  ollama-data:
+  agent-memory:
+
+services:
+
+  # ── OLLAMA (Local LLM) ──────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    networks: [soc-net]
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+
+  # ── WAZUH MANAGER ──────────────────────────────────
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.7.5
+    container_name: wazuh-manager
+    hostname: wazuh-manager
+    networks: [soc-net]
+    ports:
+      - "1514:1514/udp"
+      - "1515:1515"
+      - "55000:55000"
+    environment:
+      - WAZUH_API_USER=${WAZUH_API_USER}
+      - WAZUH_API_PASSWORD=${WAZUH_API_PASS}
+    volumes:
+      - wazuh-data:/var/ossec/data
+      - wazuh-logs:/var/ossec/logs
+    restart: unless-stopped
+
+  # ── AGENT ORCHESTRATOR ─────────────────────────────
+  agent:
+    build: ./agent
+    container_name: soc-agent
+    networks: [soc-net]
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - agent-memory:/app/memory
+      - ./agent:/app
+    depends_on:
+      - ollama
+      - wazuh-manager
+    restart: unless-stopped
+
+  # ── SOC DASHBOARD ──────────────────────────────────
+  dashboard:
+    build: ./dashboard
+    container_name: soc-dashboard
+    networks: [soc-net]
+    ports:
+      - "3000:80"
+    depends_on:
+      - agent
+    restart: unless-stopped
+
+  # ── VICTIM NODE ────────────────────────────────────
+  victim-node:
+    image: ubuntu:22.04
+    container_name: victim-node
+    hostname: victim-node
+    networks: [soc-net]
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    command: >
+      bash -c "
+        apt-get update -qq &&
+        apt-get install -y -qq openssh-server apache2 curl 2>/dev/null &&
+        mkdir -p /run/sshd &&
+        echo 'root:toor' | chpasswd &&
+        sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config &&
+        sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config &&
+        service apache2 start &&
+        /usr/sbin/sshd -D
+      "
+    restart: unless-stopped
+
+  # ── ATTACK SIMULATOR ───────────────────────────────
+  simulator:
+    build: ./simulator
+    container_name: attacker-sim
+    hostname: attacker-sim
+    networks: [soc-net]
+    depends_on:
+      - victim-node
+      - agent
+    restart: unless-stopped
+
